@@ -25,14 +25,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Plus, Package, ArrowDown, ArrowUp } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Package,
+  ArrowDown,
+  ArrowUp,
+  Ban,
+  History,
+} from "lucide-react";
 import { apiService } from "@/lib/api/apiService";
 import type { Product, ProductMovement } from "@/lib/api/types";
 import { ErrorDisplay } from "@/components/error-display";
+import { ProductOutModal } from "@/components/product-out-modal";
+import { VoidProductOutModal } from "@/components/void-product-out-modal";
+import { VoidedProductOutsHistoryModal } from "@/components/voided-product-outs-history-modal";
 
 export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isProductOutOpen, setIsProductOutOpen] = useState(false);
+  const [voidMovement, setVoidMovement] = useState<ProductMovement | null>(
+    null
+  );
+  const [isVoidHistoryOpen, setIsVoidHistoryOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -80,6 +96,19 @@ export default function ProductsPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const refreshProductsAndMovements = async () => {
+    const [productsResponse, movementsResponse] = await Promise.all([
+      apiService.products.getAll(),
+      apiService.products.getMovements(),
+    ]);
+    if (productsResponse.success) {
+      setProducts(productsResponse.products);
+    }
+    if (movementsResponse.success) {
+      setMovements(movementsResponse.movements);
+    }
+  };
 
   // Filter products based on search
   const filteredProducts = products.filter((product) =>
@@ -131,10 +160,20 @@ export default function ProductsPage() {
         title="Products"
         description="Manage inventory and track product movements"
         headerAction={
-          <Button disabled>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Product
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button disabled variant="outline">
+              <ArrowUp className="mr-2 h-4 w-4" />
+              Product out
+            </Button>
+            <Button disabled variant="outline">
+              <History className="mr-2 h-4 w-4" />
+              History
+            </Button>
+            <Button disabled>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Product
+            </Button>
+          </div>
         }
       >
         {/* Summary Cards Skeleton */}
@@ -208,13 +247,31 @@ export default function ProductsPage() {
       title="Products"
       description="Manage inventory and track product movements"
       headerAction={
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Product
-            </Button>
-          </DialogTrigger>
+        <div className="flex flex-wrap items-center gap-2">
+          <ProductOutModal
+            open={isProductOutOpen}
+            onOpenChange={setIsProductOutOpen}
+            products={products}
+            onSuccess={refreshProductsAndMovements}
+          />
+          <Button variant="outline" onClick={() => setIsProductOutOpen(true)}>
+            <ArrowUp className="mr-2 h-4 w-4" />
+            Product out
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setIsVoidHistoryOpen(true)}
+          >
+            <History className="mr-2 h-4 w-4" />
+            History
+          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Product
+              </Button>
+            </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add New Product</DialogTitle>
@@ -288,7 +345,8 @@ export default function ProductsPage() {
                 </DialogFooter>
               </form>
             </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       }
     >
       {/* Error Display */}
@@ -422,10 +480,22 @@ export default function ProductsPage() {
                   <TableHead>Type</TableHead>
                   <TableHead>Quantity</TableHead>
                   <TableHead>Reason</TableHead>
+                  <TableHead>Recorded by</TableHead>
+                  <TableHead className="text-right w-[120px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {movements.map((movement) => (
+                {movements.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="text-center text-muted-foreground py-8"
+                    >
+                      No movements recorded yet
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  movements.map((movement) => (
                   <TableRow key={movement.id}>
                     <TableCell>
                       <div>
@@ -449,12 +519,49 @@ export default function ProductsPage() {
                     </TableCell>
                     <TableCell className="font-medium">{movement.quantity}</TableCell>
                     <TableCell className="text-muted-foreground">{movement.reason}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {movement.type === "out" && movement.employeeName
+                        ? movement.employeeName
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {movement.type === "out" &&
+                      movement.productId != null ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => setVoidMovement(movement)}
+                        >
+                          <Ban className="mr-1.5 h-3.5 w-3.5" />
+                          Void
+                        </Button>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                   </TableRow>
-                ))}
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
+
+        <VoidedProductOutsHistoryModal
+          open={isVoidHistoryOpen}
+          onOpenChange={setIsVoidHistoryOpen}
+        />
+
+        <VoidProductOutModal
+          open={voidMovement !== null}
+          onOpenChange={(open) => {
+            if (!open) setVoidMovement(null);
+          }}
+          movement={voidMovement}
+          onSuccess={refreshProductsAndMovements}
+        />
     </DashboardShell>
   );
 }

@@ -194,15 +194,7 @@ function CashierPage({ user }: { user?: User }) {
   const [isCheckoutDialogOpen, setIsCheckoutDialogOpen] = useState(false);
   const [checkoutTotal, setCheckoutTotal] = useState(0);
   const [customerName, setCustomerName] = useState("");
-  const [purchaseHistory, setPurchaseHistory] = useState<Array<{
-    items: CartItem[];
-    customerName: string;
-    total: number;
-    receiptNumber: string;
-    date: string;
-    time: string;
-    timestamp: number;
-  }>>([]);
+  const [purchaseHistory, setPurchaseHistory] = useState<Transaction[]>([]);
   const [receiptData, setReceiptData] = useState<{
     items: CartItem[];
     customerName: string;
@@ -426,37 +418,36 @@ function CashierPage({ user }: { user?: User }) {
       });
 
       if (result.success && result.transaction) {
+        const tx = result.transaction;
+
         // Store total for success dialog
         setCheckoutTotal(total);
-        
+
         // Prepare receipt data
         const receiptInfo = {
-          items: result.transaction.items,
-          customerName: result.transaction.customerName,
-          total: result.transaction.total,
-          receiptNumber: result.transaction.receiptNumber,
-          date: result.transaction.date,
-          time: result.transaction.time,
+          items: tx.items,
+          customerName: tx.customerName,
+          total: tx.total,
+          receiptNumber: tx.receiptNumber,
+          date: tx.date,
+          time: tx.time,
         };
         setReceiptData(receiptInfo);
-        
+
         // Add to purchase history
-        setPurchaseHistory((prev) => [{
-          ...result.transaction,
-          items: result.transaction.items,
-        }, ...prev]);
-        
+        setPurchaseHistory((prev) => [tx, ...prev]);
+
         // Add to kitchen orders (for kitchen dashboard)
         try {
           const kitchenOrder: KitchenOrder = {
-            id: result.transaction.id,
-            receiptNumber: result.transaction.receiptNumber,
-            customerName: result.transaction.customerName,
-            items: result.transaction.items,
-            total: result.transaction.total,
-            timestamp: result.transaction.timestamp,
-            time: result.transaction.time,
-            date: result.transaction.date,
+            id: tx.id,
+            receiptNumber: tx.receiptNumber,
+            customerName: tx.customerName,
+            items: tx.items,
+            total: tx.total,
+            timestamp: tx.timestamp,
+            time: tx.time,
+            date: tx.date,
             status: "preparing", // New orders start as "preparing"
           };
           

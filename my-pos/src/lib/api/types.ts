@@ -103,6 +103,46 @@ export interface TransactionsResponse {
   error?: string;
 }
 
+// Employee (staff list for attributing stock moves, etc.)
+export interface Employee {
+  id: number;
+  name: string;
+  role?: string;
+  address?: string;
+}
+
+export interface EmployeesResponse {
+  success: boolean;
+  employees: Employee[];
+  error?: string;
+}
+
+export interface CreateEmployeeRequest {
+  name: string;
+  role?: string;
+  address?: string;
+}
+
+export interface UpdateEmployeeRequest {
+  id: number;
+  name: string;
+  role?: string;
+  address?: string;
+}
+
+export interface EmployeeResponse {
+  success: boolean;
+  employee?: Employee;
+  error?: string;
+  message?: string;
+}
+
+export interface DeleteEmployeeResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
 // Product Movement Types
 export interface ProductMovement {
   id: number;
@@ -113,11 +153,54 @@ export interface ProductMovement {
   type: 'in' | 'out';
   quantity: number;
   reason: string;
+  employeeId?: number;
+  employeeName?: string;
 }
 
 export interface ProductMovementsResponse {
   success: boolean;
   movements: ProductMovement[];
+  error?: string;
+}
+
+export interface RecordProductOutRequest {
+  productId: number;
+  quantity: number;
+  reason: string;
+  employeeId: number;
+}
+
+export interface RecordProductOutResponse {
+  success: boolean;
+  movement?: ProductMovement;
+  product?: Product;
+  error?: string;
+}
+
+export interface VoidProductOutResponse {
+  success: boolean;
+  message?: string;
+  product?: Product;
+  error?: string;
+}
+
+export interface VoidedProductOut {
+  id: number;
+  originalMovementId: number;
+  productId: number;
+  product: string;
+  quantity: number;
+  reason: string;
+  employeeName?: string;
+  recordedDate: string;
+  recordedTime: string;
+  voidedAtDate: string;
+  voidedAtTime: string;
+}
+
+export interface VoidedProductOutsResponse {
+  success: boolean;
+  voidedOuts: VoidedProductOut[];
   error?: string;
 }
 

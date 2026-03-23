@@ -22,7 +22,8 @@ interface HeaderProps {
 
 export function Header({ isSidebarCollapsed, onToggleSidebar }: HeaderProps) {
   const router = useRouter();
-  const [currentTime, setCurrentTime] = useState(new Date());
+  /** null until client mount — avoids SSR vs client `new Date()` hydration mismatch */
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
 
@@ -59,10 +60,9 @@ export function Header({ isSidebarCollapsed, onToggleSidebar }: HeaderProps) {
   };
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
+    const tick = () => setCurrentTime(new Date());
+    tick();
+    const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -84,7 +84,7 @@ export function Header({ isSidebarCollapsed, onToggleSidebar }: HeaderProps) {
   };
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-pink-400 px-6 text-white">
+    <header className="flex h-16 items-center justify-between border-b bg-blue-600 px-6 text-white">
       <div className="flex items-center gap-4">
         <Button
           variant="ghost"
@@ -101,11 +101,15 @@ export function Header({ isSidebarCollapsed, onToggleSidebar }: HeaderProps) {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm text-white">
             <Calendar className="h-4 w-4" />
-            <span>{formatDate(currentTime)}</span>
+            <span className="inline-block min-w-[12rem] tabular-nums">
+              {currentTime ? formatDate(currentTime) : "\u00A0"}
+            </span>
           </div>
           <div className="flex items-center gap-2 text-sm text-white">
             <Clock className="h-4 w-4" />
-            <span>{formatTime(currentTime)}</span>
+            <span className="inline-block min-w-[7ch] tabular-nums">
+              {currentTime ? formatTime(currentTime) : "\u00A0"}
+            </span>
           </div>
         </div>
       </div>

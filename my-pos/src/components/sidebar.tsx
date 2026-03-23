@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-  LayoutDashboard, 
-  ShoppingCart, 
-  Package, 
-  BarChart3
+import {
+  LayoutDashboard,
+  ShoppingCart,
+  Package,
+  BarChart3,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +15,7 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Sales", href: "/sales", icon: ShoppingCart },
   { name: "Products", href: "/products", icon: Package },
+  { name: "Employees", href: "/employees", icon: Users },
   { name: "Reports", href: "/reports", icon: BarChart3 },
 ];
 
@@ -27,7 +29,7 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
   return (
     <div
       className={cn(
-        "flex h-screen flex-col border-r bg-pink-200 transition-all duration-300",
+        "flex h-screen flex-col border-r bg-blue-200 transition-all duration-300",
         isCollapsed ? "w-16" : "w-64"
       )}
     >

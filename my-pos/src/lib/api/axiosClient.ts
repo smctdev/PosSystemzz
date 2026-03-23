@@ -1,23 +1,48 @@
 /**
  * 🔧 AXIOS CLIENT CONFIGURATION
- * 
+ *
  * This file sets up Axios with default configuration and interceptors.
  * All API calls will use this configured instance.
+ *
+ * The response interceptor returns `response.data`, so resolved values are
+ * the JSON body — not AxiosResponse. `ApiClient` types the instance that way.
  */
 
-import axios from 'axios';
+import axios from "axios";
+import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
+
+/** Axios instance whose get/post/put/delete resolve to response body (see interceptor). */
+export type ApiClient = {
+  get<T>(url: string, config?: InternalAxiosRequestConfig): Promise<T>;
+  post<T>(
+    url: string,
+    data?: unknown,
+    config?: InternalAxiosRequestConfig
+  ): Promise<T>;
+  put<T>(
+    url: string,
+    data?: unknown,
+    config?: InternalAxiosRequestConfig
+  ): Promise<T>;
+  delete<T>(url: string, config?: InternalAxiosRequestConfig): Promise<T>;
+  patch<T>(
+    url: string,
+    data?: unknown,
+    config?: InternalAxiosRequestConfig
+  ): Promise<T>;
+};
 
 // Create axios instance with default config
-const axiosClient = axios.create({
-  baseURL: '/api', // All API calls will start with /api
+const instance = axios.create({
+  baseURL: "/api", // All API calls will start with /api
   timeout: 10000, // 10 seconds timeout
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
 // Request Interceptor - runs before every request
-axiosClient.interceptors.request.use(
+instance.interceptors.request.use(
   (config) => {
     // Add auth token if user is logged in
     // TODO: Uncomment when authentication is implemented
@@ -35,8 +60,8 @@ axiosClient.interceptors.request.use(
 );
 
 // Response Interceptor - runs after every response
-axiosClient.interceptors.response.use(
-  (response) => {
+instance.interceptors.response.use(
+  (response: AxiosResponse) => {
     // If successful, return the data directly
     // This way you don't need to do response.data in every call
     return response.data;
@@ -65,6 +90,8 @@ axiosClient.interceptors.response.use(
     }
   }
 );
+
+const axiosClient = instance as unknown as ApiClient;
 
 export default axiosClient;
 

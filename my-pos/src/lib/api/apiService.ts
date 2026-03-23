@@ -10,11 +10,13 @@ import { productsApi } from './products';
 import { transactionsApi } from './transactions';
 import { dashboardApi } from './dashboard';
 import { reportsApi } from './reports';
+import { employeesApi } from './employees';
 
 // Main API service object - exports all API functions
 export const apiService = {
   auth: authApi,
   products: productsApi,
+  employees: employeesApi,
   transactions: transactionsApi,
   dashboard: dashboardApi,
   reports: reportsApi,
