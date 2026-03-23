@@ -33,6 +33,7 @@ import {
   ArrowUp,
   Ban,
   History,
+  RefreshCw,
 } from "lucide-react";
 import { apiService } from "@/lib/api/apiService";
 import type { Product, ProductMovement } from "@/lib/api/types";
@@ -40,6 +41,17 @@ import { ErrorDisplay } from "@/components/error-display";
 import { ProductOutModal } from "@/components/product-out-modal";
 import { VoidProductOutModal } from "@/components/void-product-out-modal";
 import { VoidedProductOutsHistoryModal } from "@/components/voided-product-outs-history-modal";
+import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
+
+/** Minimum time the inventory refresh loading UI stays visible (2–3s range). */
+const PRODUCT_INVENTORY_REFRESH_MIN_MS = 2500;
+
+function delay(ms: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
 export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -60,6 +72,7 @@ export default function ProductsPage() {
     price: "",
     category: "",
   });
+  const [inventoryRefreshing, setInventoryRefreshing] = useState(false);
 
   // 🎯 Fetch products and movements from API
   const fetchData = async () => {
@@ -107,6 +120,18 @@ export default function ProductsPage() {
     }
     if (movementsResponse.success) {
       setMovements(movementsResponse.movements);
+    }
+  };
+
+  const handleInventoryRefresh = async () => {
+    setInventoryRefreshing(true);
+    try {
+      const started = Date.now();
+      await refreshProductsAndMovements();
+      const elapsed = Date.now() - started;
+      await delay(Math.max(0, PRODUCT_INVENTORY_REFRESH_MIN_MS - elapsed));
+    } finally {
+      setInventoryRefreshing(false);
     }
   };
 
@@ -243,6 +268,7 @@ export default function ProductsPage() {
   }
 
   return (
+    <>
     <DashboardShell
       title="Products"
       description="Manage inventory and track product movements"
@@ -358,6 +384,22 @@ export default function ProductsPage() {
       )}
 
       {/* Summary Cards */}
+      {inventoryRefreshing ? (
+        <div className="grid gap-4 md:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={`summary-skel-${i}`}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-4 rounded" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="mb-2 h-8 w-20" />
+                <Skeleton className="h-3 w-28" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -403,23 +445,44 @@ export default function ProductsPage() {
             </CardContent>
           </Card>
         </div>
+      )}
 
         {/* Products Table */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle>Product Inventory</CardTitle>
                 <CardDescription>Current stock levels for all products</CardDescription>
               </div>
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => void handleInventoryRefresh()}
+                  disabled={inventoryRefreshing}
+                  aria-label="Refresh product inventory"
+                >
+                  <RefreshCw
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      inventoryRefreshing && "animate-spin"
+                    )}
+                  />
+                  Refresh
+                </Button>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search products..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                    disabled={inventoryRefreshing}
+                  />
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -435,7 +498,27 @@ export default function ProductsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.length > 0 ? (
+                {inventoryRefreshing ? (
+                  [...Array(6)].map((_, i) => (
+                    <TableRow key={`inv-skel-${i}`}>
+                      <TableCell>
+                        <Skeleton className="h-4 w-40" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-24" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-24 rounded-full" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-20 rounded-full" />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Skeleton className="ml-auto h-4 w-16" />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredProducts.length > 0 ? (
                   filteredProducts.map((product) => (
                     <TableRow key={product.id}>
                       <TableCell className="font-medium">{product.name}</TableCell>
@@ -563,6 +646,35 @@ export default function ProductsPage() {
           onSuccess={refreshProductsAndMovements}
         />
     </DashboardShell>
+
+    <Dialog open={inventoryRefreshing}>
+      <DialogContent
+        showCloseButton={false}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        className="gap-4 border bg-card p-6 shadow-lg sm:max-w-[300px]"
+        aria-describedby="inventory-refresh-loading-desc"
+      >
+        <DialogHeader className="items-center space-y-3 text-center sm:text-center">
+          <div
+            className="flex size-11 items-center justify-center rounded-full bg-primary/10"
+            aria-hidden
+          >
+            <Spinner size="lg" className="text-primary" />
+          </div>
+          <DialogTitle className="text-base font-semibold">
+            Refreshing inventory
+          </DialogTitle>
+          <DialogDescription
+            id="inventory-refresh-loading-desc"
+            className="text-sm text-muted-foreground"
+          >
+            Updating product stock and movements…
+          </DialogDescription>
+        </DialogHeader>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 

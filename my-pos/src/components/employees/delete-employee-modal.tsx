@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const DELETE_EMPLOYEE_SUBMIT_DELAY_MS = 2000;
+const DELETE_EMPLOYEE_CONTINUE_DELAY_MS = 2000;
 
 export interface DeleteEmployeeModalProps {
   open: boolean;
@@ -55,6 +56,7 @@ export function DeleteEmployeeModal({
   const [step, setStep] = useState<"confirm" | "verify">("confirm");
   const [adminPassword, setAdminPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [continueLoading, setContinueLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const deleteInFlightRef = useRef(false);
 
@@ -63,6 +65,7 @@ export function DeleteEmployeeModal({
       setStep("confirm");
       setAdminPassword("");
       setError(null);
+      setContinueLoading(false);
       deleteInFlightRef.current = false;
       return;
     }
@@ -70,6 +73,7 @@ export function DeleteEmployeeModal({
     setStep("confirm");
     setAdminPassword("");
     setError(null);
+    setContinueLoading(false);
   }, [open, employee]);
 
   const handleOpenChange = (next: boolean) => {
@@ -77,8 +81,26 @@ export function DeleteEmployeeModal({
       setStep("confirm");
       setAdminPassword("");
       setError(null);
+      setContinueLoading(false);
     }
     onOpenChange(next);
+  };
+
+  const handleContinueToVerify = async () => {
+    setContinueLoading(true);
+    try {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+      await new Promise<void>((resolve) =>
+        setTimeout(resolve, DELETE_EMPLOYEE_CONTINUE_DELAY_MS)
+      );
+      setAdminPassword("");
+      setError(null);
+      setStep("verify");
+    } finally {
+      setContinueLoading(false);
+    }
   };
 
   const performDelete = async () => {
@@ -224,13 +246,26 @@ export function DeleteEmployeeModal({
 
               <Separator />
 
-              <div className="bg-muted/30 px-6 py-4">
+              <div className="relative bg-muted/30 px-6 py-4">
+                {continueLoading && (
+                  <div
+                    className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-lg bg-background/75 backdrop-blur-[1px]"
+                    aria-busy="true"
+                    aria-live="polite"
+                  >
+                    <Spinner size="lg" className="text-destructive" />
+                    <p className="text-sm text-muted-foreground">
+                      Preparing verification…
+                    </p>
+                  </div>
+                )}
                 <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     className="w-full sm:w-auto"
                     onClick={() => handleOpenChange(false)}
+                    disabled={continueLoading}
                   >
                     Cancel
                   </Button>
@@ -238,13 +273,17 @@ export function DeleteEmployeeModal({
                     type="button"
                     variant="destructive"
                     className="w-full sm:w-auto"
-                    onClick={() => {
-                      setAdminPassword("");
-                      setError(null);
-                      setStep("verify");
-                    }}
+                    onClick={() => void handleContinueToVerify()}
+                    disabled={continueLoading}
                   >
-                    Continue
+                    {continueLoading ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Spinner size="sm" />
+                        Please wait…
+                      </span>
+                    ) : (
+                      "Continue"
+                    )}
                   </Button>
                 </DialogFooter>
               </div>

@@ -31,6 +31,7 @@ import { toast } from "sonner";
 const ROLE_CUSTOM = "__custom__";
 const ROLE_PRESETS: readonly string[] = ["Cashier", "Kitchen", "Admin"];
 const EDIT_EMPLOYEE_SUBMIT_DELAY_MS = 2000;
+const EDIT_EMPLOYEE_CONTINUE_DELAY_MS = 2000;
 
 function roleToForm(role?: string): { preset: string; custom: string } {
   if (role && ROLE_PRESETS.includes(role)) {
@@ -59,6 +60,7 @@ export function EditEmployeeModal({
   const [address, setAddress] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [continueLoading, setContinueLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const saveInFlightRef = useRef(false);
 
@@ -66,6 +68,7 @@ export function EditEmployeeModal({
     if (!open) {
       setStep("form");
       setAdminPassword("");
+      setContinueLoading(false);
       saveInFlightRef.current = false;
       return;
     }
@@ -78,6 +81,7 @@ export function EditEmployeeModal({
     setFormError(null);
     setStep("form");
     setAdminPassword("");
+    setContinueLoading(false);
   }, [open, employee]);
 
   const resetForm = () => {
@@ -88,6 +92,7 @@ export function EditEmployeeModal({
     if (!next) {
       setStep("form");
       setAdminPassword("");
+      setContinueLoading(false);
       resetForm();
     }
     onOpenChange(next);
@@ -101,9 +106,9 @@ export function EditEmployeeModal({
     return rolePreset;
   };
 
-  const handleFormContinue = (e: React.FormEvent) => {
+  const handleFormContinue = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!employee) return;
+    if (!employee || continueLoading) return;
     setFormError(null);
     const trimmed = name.trim();
     if (!trimmed) {
@@ -118,8 +123,20 @@ export function EditEmployeeModal({
       setFormError("Select an address from the list.");
       return;
     }
-    setAdminPassword("");
-    setStep("verify");
+
+    setContinueLoading(true);
+    try {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+      await new Promise<void>((resolve) =>
+        setTimeout(resolve, EDIT_EMPLOYEE_CONTINUE_DELAY_MS)
+      );
+      setAdminPassword("");
+      setStep("verify");
+    } finally {
+      setContinueLoading(false);
+    }
   };
 
   const performUpdate = async () => {
@@ -187,8 +204,21 @@ export function EditEmployeeModal({
                   admin password before changes are saved.
                 </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleFormContinue}>
-                <div className="grid gap-4 py-2">
+              <div className="relative">
+                {continueLoading && (
+                  <div
+                    className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-lg bg-background/75 backdrop-blur-[1px]"
+                    aria-busy="true"
+                    aria-live="polite"
+                  >
+                    <Spinner size="lg" className="text-primary" />
+                    <p className="text-sm text-muted-foreground">
+                      Preparing verification…
+                    </p>
+                  </div>
+                )}
+                <form onSubmit={(e) => void handleFormContinue(e)}>
+                  <div className="grid gap-4 py-2">
                   {formError && (
                     <p className="text-sm text-destructive" role="alert">
                       {formError}
@@ -200,7 +230,7 @@ export function EditEmployeeModal({
                       id="edit-emp-name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      disabled={submitting}
+                      disabled={submitting || continueLoading}
                       required
                       autoComplete="name"
                     />
@@ -210,7 +240,7 @@ export function EditEmployeeModal({
                     <Select
                       value={rolePreset}
                       onValueChange={setRolePreset}
-                      disabled={submitting}
+                      disabled={submitting || continueLoading}
                     >
                       <SelectTrigger id="edit-emp-role-preset" className="w-full">
                         <SelectValue placeholder="Role" />
@@ -228,7 +258,7 @@ export function EditEmployeeModal({
                         value={roleCustom}
                         onChange={(e) => setRoleCustom(e.target.value)}
                         placeholder="Type role"
-                        disabled={submitting}
+                        disabled={submitting || continueLoading}
                       />
                     )}
                   </div>
@@ -237,7 +267,7 @@ export function EditEmployeeModal({
                     options={EMPLOYEE_ADDRESS_OPTIONS}
                     value={address}
                     onValueChange={setAddress}
-                    disabled={submitting}
+                    disabled={submitting || continueLoading}
                     label="Address"
                     placeholder="Search address…"
                   />
@@ -247,15 +277,26 @@ export function EditEmployeeModal({
                     type="button"
                     variant="outline"
                     onClick={() => handleOpenChange(false)}
-                    disabled={submitting}
+                    disabled={submitting || continueLoading}
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={submitting || !address.trim()}>
-                    Continue
+                  <Button
+                    type="submit"
+                    disabled={submitting || continueLoading || !address.trim()}
+                  >
+                    {continueLoading ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Spinner size="sm" />
+                        Please wait…
+                      </span>
+                    ) : (
+                      "Continue"
+                    )}
                   </Button>
                 </DialogFooter>
               </form>
+              </div>
             </>
           ) : (
             <div className="relative">
