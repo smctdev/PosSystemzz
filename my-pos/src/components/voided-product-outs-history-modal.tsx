@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Table,
   TableBody,
@@ -24,6 +24,14 @@ import { apiService } from "@/lib/api/apiService";
 import type { VoidedProductOut } from "@/lib/api/types";
 import { History, ScrollText } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const VOID_HISTORY_LOADING_DELAY_MS = 2000;
+
+function delay(ms: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
 export interface VoidedProductOutsHistoryModalProps {
   open: boolean;
@@ -45,6 +53,9 @@ export function VoidedProductOutsHistoryModal({
       setLoading(true);
       setFetchError(null);
       try {
+        // Keep the spinner visible for a short, consistent period.
+        await delay(VOID_HISTORY_LOADING_DELAY_MS);
+        if (cancelled) return;
         const res = await apiService.products.getVoidedProductOuts();
         if (cancelled) return;
         if (res.success) {
@@ -114,10 +125,11 @@ export function VoidedProductOutsHistoryModal({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           {loading ? (
-            <div className="space-y-3 rounded-xl border border-dashed border-muted-foreground/25 bg-muted/20 p-4">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <Skeleton key={i} className="h-11 w-full" />
-              ))}
+            <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-muted-foreground/25 bg-muted/20 px-6 py-14 text-center">
+              <Spinner size="lg" className="text-primary" />
+              <p className="text-sm text-muted-foreground">
+                Loading voided outs...
+              </p>
             </div>
           ) : fetchError ? (
             <div

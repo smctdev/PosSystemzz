@@ -23,6 +23,15 @@ import { Spinner } from "@/components/ui/spinner";
 import { EmployeeCombobox } from "@/components/employee-combobox";
 import { apiService } from "@/lib/api/apiService";
 import type { Employee, Product } from "@/lib/api/types";
+import { toast } from "sonner";
+
+const PRODUCT_OUT_LOADING_MIN_MS = 2000;
+
+function delay(ms: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
 export interface ProductOutModalProps {
   open: boolean;
@@ -129,6 +138,7 @@ export function ProductOutModal({
 
     setSubmitting(true);
     try {
+      const startedAt = Date.now();
       const result = await apiService.products.recordProductOut({
         productId: id,
         quantity: qty,
@@ -139,6 +149,16 @@ export function ProductOutModal({
         setFormError(result.error || "Could not record product out.");
         return;
       }
+      // Ensure the loading spinner stays visible for a consistent minimum time.
+      const elapsed = Date.now() - startedAt;
+      await delay(Math.max(0, PRODUCT_OUT_LOADING_MIN_MS - elapsed));
+
+      const productName =
+        products.find((p) => p.id === id)?.name ?? "Product";
+      toast.success("Product out recorded", {
+        description: `Recorded ${qty} unit(s) out for ${productName}.`,
+      });
+
       await onSuccess?.();
       handleOpenChange(false);
     } catch (err) {
@@ -152,108 +172,141 @@ export function ProductOutModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Product out</DialogTitle>
-          <DialogDescription>
-            Remove stock for waste, transfer, samples, or other non-sale
-            reasons. Sales should use the cashier flow.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-2">
-            {formError && (
-              <p className="text-sm text-destructive" role="alert">
-                {formError}
-              </p>
-            )}
-            <div className="grid gap-2">
-              <Label htmlFor="product-out-product">Product</Label>
-              <Select
-                value={productId || undefined}
-                onValueChange={setProductId}
-                disabled={availableProducts.length === 0 || submitting}
-              >
-                <SelectTrigger id="product-out-product" className="w-full">
-                  <SelectValue placeholder="Select product" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableProducts.map((p) => (
-                    <SelectItem key={p.id} value={String(p.id)}>
-                      {p.name} ({p.stock} in stock
-                      {p.sku ? ` · ${p.sku}` : ""})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {availableProducts.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                  No products with stock available.
-                </p>
-              )}
+      <DialogContent
+        className="sm:max-w-md"
+        showCloseButton={!submitting}
+        onPointerDownOutside={(e) => {
+          if (submitting) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (submitting) e.preventDefault();
+        }}
+      >
+        {submitting ? (
+          <div className="flex flex-col items-center justify-center gap-4 py-8 text-center">
+            <div
+              className="flex size-11 items-center justify-center rounded-full bg-primary/10"
+              aria-hidden
+            >
+              <Spinner size="lg" className="text-primary" />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="product-out-qty">Quantity</Label>
-              <Input
-                id="product-out-qty"
-                type="number"
-                min={1}
-                max={maxQty || undefined}
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                disabled={!productId || submitting}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="product-out-reason">Reason</Label>
-              <Input
-                id="product-out-reason"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. Damaged, expired, staff meal"
-                disabled={submitting}
-                required
-              />
-            </div>
-            <EmployeeCombobox
-              id="product-out-employee"
-              employees={employees}
-              value={employeeId}
-              onValueChange={setEmployeeId}
-              loading={employeesLoading}
-              disabled={submitting}
-            />
+            <DialogHeader className="space-y-3 text-center sm:text-center">
+              <DialogTitle className="text-base font-semibold">
+                Saving product out
+              </DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground">
+                Updating inventory and recording the movement…
+              </DialogDescription>
+            </DialogHeader>
           </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => handleOpenChange(false)}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={
-                submitting ||
-                availableProducts.length === 0 ||
-                !productId ||
-                !employeeId ||
-                employeesLoading
-              }
-            >
-              {submitting ? (
-                <span className="inline-flex items-center gap-2">
-                  <Spinner size="sm" />
-                  Saving…
-                </span>
-              ) : (
-                "Confirm"
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>Product out</DialogTitle>
+              <DialogDescription>
+                Remove stock for waste, transfer, samples, or other non-sale
+                reasons. Sales should use the cashier flow.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit}>
+              <div className="grid gap-4 py-2">
+                {formError && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {formError}
+                  </p>
+                )}
+                <div className="grid gap-2">
+                  <Label htmlFor="product-out-product">Product</Label>
+                  <Select
+                    value={productId || undefined}
+                    onValueChange={setProductId}
+                    disabled={availableProducts.length === 0 || submitting}
+                  >
+                    <SelectTrigger
+                      id="product-out-product"
+                      className="w-full"
+                    >
+                      <SelectValue placeholder="Select product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableProducts.map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.name} ({p.stock} in stock
+                          {p.sku ? ` · ${p.sku}` : ""})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {availableProducts.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No products with stock available.
+                    </p>
+                  )}
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="product-out-qty">Quantity</Label>
+                  <Input
+                    id="product-out-qty"
+                    type="number"
+                    min={1}
+                    max={maxQty || undefined}
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    disabled={!productId || submitting}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="product-out-reason">Reason</Label>
+                  <Input
+                    id="product-out-reason"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="e.g. Damaged, expired, staff meal"
+                    disabled={submitting}
+                    required
+                  />
+                </div>
+                <EmployeeCombobox
+                  id="product-out-employee"
+                  employees={employees}
+                  value={employeeId}
+                  onValueChange={setEmployeeId}
+                  loading={employeesLoading}
+                  disabled={submitting}
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleOpenChange(false)}
+                  disabled={submitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={
+                    submitting ||
+                    availableProducts.length === 0 ||
+                    !productId ||
+                    !employeeId ||
+                    employeesLoading
+                  }
+                >
+                  {submitting ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Spinner size="sm" />
+                      Saving…
+                    </span>
+                  ) : (
+                    "Confirm"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
